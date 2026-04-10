@@ -109,7 +109,7 @@ return [
     |
     */
 
-    'display_timezone' => null,
+    'display_timezone' => 'Africa/Lagos',
 
     /*
     |--------------------------------------------------------------------------
@@ -123,7 +123,7 @@ return [
     |
     */
 
-    'localize_dates_in_modifiers' => false,
+    'localize_dates_in_modifiers' => true,
 
     /*
     |--------------------------------------------------------------------------
