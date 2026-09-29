@@ -1,13 +1,14 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "statamic/statamic",
+    "name": "dataphyte/climatehub",
     "type": "project",
-    "description": "Statamic",
+    "description": "ClimateHub climate intelligence portal",
     "keywords": [
-        "statamic",
-        "cms",
-        "flat file",
-        "laravel"
+        "climatehub",
+        "climate-intelligence",
+        "data-portal",
+        "laravel",
+        "statamic"
     ],
     "require": {
         "php": "^8.3",
@@ -44,7 +45,7 @@
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
-            "@php artisan migrate --force",
+            "@php artisan migrate --force --seed",
             "npm install --ignore-scripts",
             "npm run build"
         ],
