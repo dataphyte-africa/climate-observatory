@@ -1,0 +1,67 @@
+title: 'Dataset Metadata'
+fields:
+  -
+    handle: dataset_code
+    field:
+      type: text
+      display: 'Dataset Code'
+      instructions: 'Stable identifier for this catalogue record.'
+      validate:
+        - required
+  -
+    handle: summary
+    field:
+      type: textarea
+      display: Summary
+      instructions: 'Short plain-language description shown in indexes and cards.'
+  -
+    handle: description
+    field:
+      type: markdown
+      display: Description
+      instructions: 'Longer explanation of what the dataset measures and how it should be used.'
+  -
+    handle: dataset_type
+    field:
+      type: select
+      display: 'Dataset Type'
+      options:
+        country_year_indicator: 'Country-Year Indicator'
+        country_year_sector_gas: 'Country-Year Sector Gas'
+        admin_period_indicator: 'Admin Period Indicator'
+        country_document: 'Country Document'
+        document_sector_response: 'Document Sector Response'
+        event_impact: 'Event Impact'
+      default: country_year_indicator
+  -
+    handle: update_frequency
+    field:
+      type: select
+      display: 'Update Frequency'
+      options:
+        ad_hoc: 'Ad Hoc'
+        annual: Annual
+        quarterly: Quarterly
+        monthly: Monthly
+        biweekly: Biweekly
+        dekadal: Dekadal
+  -
+    handle: coverage_period_start
+    field:
+      type: date
+      display: 'Coverage Start'
+  -
+    handle: coverage_period_end
+    field:
+      type: date
+      display: 'Coverage End'
+  -
+    handle: license
+    field:
+      type: text
+      display: License
+  -
+    handle: citation
+    field:
+      type: textarea
+      display: Citation

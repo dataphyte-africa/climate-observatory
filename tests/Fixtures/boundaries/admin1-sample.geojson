@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "adm1_name": "Abia",
+        "adm1_pcode": "NG001",
+        "adm0_pcode": "NG",
+        "valid_on": "2019-04-17",
+        "valid_to": null,
+        "area_sqkm": 4859.5,
+        "version": "v01",
+        "adm1_ref_name": "Abia",
+        "center_lat": 5.4318197,
+        "center_lon": 7.48834209
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[[7.0, 5.0], [7.1, 5.0], [7.1, 5.1], [7.0, 5.1], [7.0, 5.0]]]]
+      }
+    }
+  ]
+}

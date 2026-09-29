@@ -1,4 +1,4 @@
-# admin:
-#   title: Administrator
-#   permissions:
-#     - super
+climatehub_operator:
+  title: ClimateHub Operator
+  permissions:
+    - access cp

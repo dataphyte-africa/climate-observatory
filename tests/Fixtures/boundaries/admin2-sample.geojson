@@ -1,0 +1,28 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "adm2_name": "Aba North",
+        "adm2_pcode": "NG001001",
+        "adm1_name": "Abia",
+        "adm1_pcode": "NG001",
+        "adm0_pcode": "NG",
+        "valid_on": "2019-04-17",
+        "valid_to": null,
+        "area_sqkm": 18.685,
+        "version": "v01",
+        "adm2_ref_name": "Aba North",
+        "sendist_en": "Abia South",
+        "sendistpcode": "NG00103",
+        "center_lat": 5.10828476,
+        "center_lon": 7.34210126
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[[7.3, 5.0], [7.4, 5.0], [7.4, 5.1], [7.3, 5.1], [7.3, 5.0]]]]
+      }
+    }
+  ]
+}

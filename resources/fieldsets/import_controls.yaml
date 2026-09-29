@@ -1,0 +1,69 @@
+title: 'Import Controls'
+fields:
+  -
+    handle: import_schema
+    field:
+      type: select
+      display: 'Import Schema'
+      instructions: 'Select the transformer used for CSV ingestion.'
+      clearable: true
+      options:
+        wide_country_sector_gas_year: 'Wide Country Sector Gas Year'
+        long_admin_period_indicator: 'Long Admin Period Indicator'
+  -
+    handle: default_fact_table
+    field:
+      type: select
+      display: 'Default Fact Table'
+      clearable: true
+      instructions: 'Canonical Laravel table that stores imported facts for this dataset family.'
+      options:
+        country_year_sector_gas_values: country_year_sector_gas_values
+        admin_period_indicator_values: admin_period_indicator_values
+        country_year_indicator_values: country_year_indicator_values
+        country_documents: country_documents
+        country_document_sector_responses: country_document_sector_responses
+        event_impacts: event_impacts
+  -
+    handle: api_enabled
+    field:
+      type: toggle
+      display: 'API Enabled'
+      default: true
+  -
+    handle: download_enabled
+    field:
+      type: toggle
+      display: 'Download Enabled'
+      default: true
+  -
+    handle: status
+    field:
+      type: select
+      display: Status
+      instructions: 'Catalogue status is separate from import completion and dataset-version publication.'
+      options:
+        draft: Draft
+        review: 'Ready for Review'
+        active: Active
+        published: Published
+        archived: Archived
+      default: draft
+  -
+    handle: publication_readiness
+    field:
+      type: select
+      display: 'Publication Readiness'
+      instructions: 'Operator-facing readiness gate used before a dataset version is promoted.'
+      options:
+        needs_metadata: 'Needs Metadata'
+        needs_quality_review: 'Needs Quality Review'
+        ready_for_publication: 'Ready for Publication'
+        published: Published
+      default: needs_metadata
+  -
+    handle: quality_review_notes
+    field:
+      type: markdown
+      display: 'Quality Review Notes'
+      instructions: 'Document missingness, rejected rows, unmatched geographies, unit/date issues, or caveats before publication.'

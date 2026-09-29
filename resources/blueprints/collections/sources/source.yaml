@@ -1,0 +1,63 @@
+title: Source
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Identity
+        fields:
+          -
+            handle: title
+            field:
+              type: text
+              display: Title
+              validate:
+                - required
+          -
+            handle: source_code
+            field:
+              type: text
+              display: 'Source Code'
+              instructions: 'Stable code used for imports and source resolution.'
+              validate:
+                - required
+          -
+            handle: organization_name
+            field:
+              type: text
+              display: Organization
+          -
+            handle: homepage_url
+            field:
+              type: text
+              input_type: url
+              display: 'Homepage URL'
+      -
+        display: Licensing
+        fields:
+          -
+            handle: license_summary
+            field:
+              type: textarea
+              display: 'License Summary'
+          -
+            handle: license_url
+            field:
+              type: text
+              input_type: url
+              display: 'License URL'
+          -
+            handle: citation_template
+            field:
+              type: textarea
+              display: 'Citation Template'
+  notes:
+    display: Notes
+    sections:
+      -
+        fields:
+          -
+            handle: notes
+            field:
+              type: markdown
+              display: Notes

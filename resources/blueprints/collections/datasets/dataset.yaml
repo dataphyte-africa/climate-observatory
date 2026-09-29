@@ -1,0 +1,53 @@
+title: Dataset
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Identity
+        fields:
+          -
+            handle: title
+            field:
+              type: text
+              display: Title
+              validate:
+                - required
+          -
+            import: dataset_metadata
+      -
+        display: Relationships
+        fields:
+          -
+            handle: source_entry
+            field:
+              type: entries
+              display: Source
+              collections:
+                - sources
+              max_items: 1
+          -
+            handle: methodology_entry
+            field:
+              type: entries
+              display: Methodology
+              collections:
+                - methodologies
+              max_items: 1
+  publication:
+    display: Publication
+    sections:
+      -
+        display: Catalogue Display
+        fields:
+          -
+            handle: featured
+            field:
+              type: toggle
+              display: Featured
+              default: false
+          -
+            handle: notes
+            field:
+              type: markdown
+              display: Notes

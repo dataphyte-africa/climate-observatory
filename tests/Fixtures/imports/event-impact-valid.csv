@@ -1,0 +1,2 @@
+country,event_date,event_type,event_name,metric_code,geography_code,value,unit
+NGA,2026-04-12,flood,Sample Flood Event,people_displaced,NG002,540,people

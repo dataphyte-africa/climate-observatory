@@ -1,0 +1,56 @@
+title: Methodology
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Content
+        fields:
+          -
+            handle: title
+            field:
+              type: text
+              display: Title
+              validate:
+                - required
+          -
+            handle: methodology_code
+            field:
+              type: text
+              display: 'Methodology Code'
+              validate:
+                - required
+          -
+            handle: summary
+            field:
+              type: textarea
+              display: Summary
+          -
+            handle: body
+            field:
+              type: markdown
+              display: Body
+      -
+        display: References
+        fields:
+          -
+            handle: source_entry
+            field:
+              type: entries
+              display: Source
+              collections:
+                - sources
+              max_items: 1
+          -
+            handle: reference_url
+            field:
+              type: text
+              input_type: url
+              display: 'Reference URL'
+          -
+            handle: related_datasets
+            field:
+              type: entries
+              display: 'Related Datasets'
+              collections:
+                - datasets
