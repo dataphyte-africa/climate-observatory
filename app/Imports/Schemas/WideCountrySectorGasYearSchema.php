@@ -71,12 +71,7 @@ class WideCountrySectorGasYearSchema implements CsvImportSchema
             throw new CsvImportRowException('gas', 'Gas column is required.');
         }
 
-        $source = $sourceName
-            ? Source::firstOrCreate(
-                ['code' => Str::slug($sourceName, '_')],
-                ['name' => $sourceName]
-            )
-            : $version->dataset?->source;
+        $source = $sourceName ? $this->resolveSource($sourceName) : $version->dataset?->source;
 
         $sector = Sector::firstOrCreate(
             ['code' => Str::slug($sectorName, '_')],
@@ -125,6 +120,24 @@ class WideCountrySectorGasYearSchema implements CsvImportSchema
         }
 
         return $records;
+    }
+
+    private function resolveSource(string $sourceName): Source
+    {
+        $sourceCode = Str::slug($sourceName, '_');
+        $displayName = match (Str::upper(trim($sourceName))) {
+            'PIK' => 'PRIMAP',
+            default => $sourceName,
+        };
+
+        if ($displayName !== $sourceName) {
+            return Source::updateOrCreate(
+                ['code' => $sourceCode],
+                ['name' => $displayName]
+            );
+        }
+
+        return Source::firstOrCreate(['code' => $sourceCode], ['name' => $displayName]);
     }
 
     public function naturalKey(array $record): string

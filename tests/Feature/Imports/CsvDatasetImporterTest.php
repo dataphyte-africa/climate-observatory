@@ -73,6 +73,22 @@ class CsvDatasetImporterTest extends TestCase
         $this->assertSame(2, DB::table('import_staged_records')->where('import_id', $import->id)->count());
     }
 
+    public function test_pik_emissions_source_is_labelled_as_primap(): void
+    {
+        $version = $this->newVersion('climatewatch_historical_emissions', 'primap-source-fixture');
+
+        app(CsvDatasetImporter::class)->import(
+            'wide_country_sector_gas_year',
+            base_path('tests/Fixtures/imports/wide-country-sector-gas-year-primap.csv'),
+            $version
+        );
+
+        $this->assertDatabaseHas('sources', [
+            'code' => 'pik',
+            'name' => 'PRIMAP',
+        ]);
+    }
+
     public function test_approved_import_applies_staged_rows_and_reimport_upserts_by_natural_key(): void
     {
         $version = $this->newVersion('climatewatch_historical_emissions', 'incremental-fixture');
