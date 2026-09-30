@@ -172,7 +172,7 @@ class DatasetPagesTest extends TestCase
             ->assertDontSee('Nigeria state and city emissions');
     }
 
-    public function test_downloads_and_about_pages_load(): void
+    public function test_downloads_and_topics_pages_load(): void
     {
         Dataset::query()
             ->where('code', 'climatewatch_historical_emissions')
@@ -213,14 +213,9 @@ class DatasetPagesTest extends TestCase
             ->assertSee('Rainfall')
             ->assertDontSee('climate-data');
 
-        $this->get('/about')
-            ->assertOk()
-            ->assertSee('About ClimateHub')
-            ->assertSee('Data standards')
-            ->assertDontSee('climate-data');
     }
 
-    public function test_profile_methodology_and_story_routes_load_with_unavailable_states(): void
+    public function test_profile_and_story_routes_load_with_unavailable_states(): void
     {
         $this->get('/countries/NG')
             ->assertOk()
@@ -237,18 +232,17 @@ class DatasetPagesTest extends TestCase
             ->assertSee('Unavailable pending INEC wardcode-to-PCODE crosswalk')
             ->assertDontSee('climate-data');
 
-        $this->get('/methodologies/subnational_rainfall_indicators')
-            ->assertOk()
-            ->assertSee('Subnational Rainfall Indicators')
-            ->assertSee('Nigeria Rainfall Indicators at Subnational Level')
-            ->assertSee('Reuse requirements')
-            ->assertDontSee('climate-data');
-
         $this->get('/stories/rainfall-and-floods')
             ->assertOk()
             ->assertSee('Rainfall And Floods')
             ->assertSee('Opening evidence')
             ->assertSee('without inventing narrative claims')
             ->assertDontSee('climate-data');
+    }
+
+    public function test_retired_about_and_methodology_routes_are_not_publicly_available(): void
+    {
+        $this->get('/about')->assertNotFound();
+        $this->get('/methodologies/subnational_rainfall_indicators')->assertNotFound();
     }
 }

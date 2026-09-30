@@ -336,14 +336,6 @@ class DatasetPageController extends Controller
         ]);
     }
 
-    public function about(): View
-    {
-        return view('public.about', [
-            'datasetCount' => Dataset::query()->where('status', 'active')->count(),
-            'sourceCount' => Source::query()->count(),
-        ]);
-    }
-
     public function country(string $countryCode): View
     {
         return view('public.profile', [
@@ -367,21 +359,6 @@ class DatasetPageController extends Controller
             'datasets' => $this->activeDatasets(['admin_period_indicator', 'event_impact'])->get(),
             'mapStatus' => 'Boundary highlight, parent hierarchy, and unavailable-measure states require the MAP-01 handoff before final binding.',
             'sections' => $this->profileSections('geography'),
-        ]);
-    }
-
-    public function methodology(string $code): View
-    {
-        $datasets = $this->activeDatasets()
-            ->get()
-            ->filter(fn (Dataset $dataset) => ($dataset->settings['methodology_code'] ?? null) === $code)
-            ->values();
-
-        return view('public.methodology', [
-            'code' => $code,
-            'title' => str($code)->replace('_', ' ')->headline(),
-            'datasets' => $datasets,
-            'fallbackSections' => $this->methodologyFallbackSections($code),
         ]);
     }
 
@@ -655,15 +632,6 @@ class DatasetPageController extends Controller
             ['title' => 'Rainfall coverage', 'state' => 'No-data and no-value states must remain visible.'],
             ['title' => 'Flood events', 'state' => 'Event rows available where source geography resolves.'],
             ['title' => 'Ward drilldown', 'state' => 'Unavailable pending INEC wardcode-to-PCODE crosswalk.'],
-        ];
-    }
-
-    private function methodologyFallbackSections(string $code): array
-    {
-        return [
-            ['title' => 'Plain-language method', 'body' => 'Static interface fixture. Replace with database-backed Statamic methodology body when the public methodology entry is available to this route.'],
-            ['title' => 'Coverage and missingness', 'body' => 'Use the related dataset coverage notes and caveats shown below. Missing source values must render as not reported, not zero.'],
-            ['title' => 'Reuse requirements', 'body' => 'Keep source, version, period, unit, geography level, applied filters, and citation visible beside every chart, map, table, and export.'],
         ];
     }
 

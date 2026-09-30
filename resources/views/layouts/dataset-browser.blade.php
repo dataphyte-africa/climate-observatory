@@ -58,11 +58,9 @@
                     <div class="flex flex-col gap-2">
                         <span class="text-xs font-semibold uppercase tracking-[0.05em] text-on-surface">Resources</span>
                         <a class="text-sm leading-5 text-on-surface-variant opacity-80 transition-opacity hover:text-secondary hover:opacity-100" href="/downloads">Download data</a>
-                        <a class="text-sm leading-5 text-on-surface-variant opacity-80 transition-opacity hover:text-secondary hover:opacity-100" href="/methodologies/subnational_rainfall_indicators">Read methodologies</a>
-                        <a class="text-sm leading-5 text-on-surface-variant opacity-80 transition-opacity hover:text-secondary hover:opacity-100" href="/about">Source &amp; Update Notes</a>
                     </div>
                     <div class="mt-4 flex flex-col justify-end md:mt-0 md:items-end">
-                        <span class="text-sm leading-5 text-on-surface-variant">© 2024 ClimateHub Data Portal. All rights reserved.</span>
+                        <span class="text-sm leading-5 text-on-surface-variant">© {{ now()->year }} ClimateHub Data Portal. All rights reserved.</span>
                     </div>
                 </div>
             </footer>
