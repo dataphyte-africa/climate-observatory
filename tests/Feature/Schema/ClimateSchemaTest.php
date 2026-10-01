@@ -5,6 +5,7 @@ namespace Tests\Feature\Schema;
 use App\Models\Geography;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -75,5 +76,13 @@ class ClimateSchemaTest extends TestCase
     {
         $this->assertFileDoesNotExist(base_path('content/collections/pages/home.md'));
         $this->assertFileDoesNotExist(base_path('content/trees/collections/pages.yaml'));
+    }
+
+    public function test_retired_data_files_collection_is_not_registered(): void
+    {
+        $this->assertFileDoesNotExist(base_path('content/collections/data_files.yaml'));
+        $this->assertFileDoesNotExist(base_path('resources/blueprints/collections/data_files/data_file.yaml'));
+        $this->assertDatabaseMissing('collections', ['handle' => 'data_files']);
+        $this->assertSame(0, DB::table('entries')->where('collection', 'data_files')->count());
     }
 }
