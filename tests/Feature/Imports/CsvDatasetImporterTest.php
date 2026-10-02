@@ -89,7 +89,7 @@ class CsvDatasetImporterTest extends TestCase
         ]);
     }
 
-    public function test_approved_import_applies_staged_rows_and_reimport_upserts_by_natural_key(): void
+    public function test_emissions_reimport_rejects_existing_natural_keys_without_upserting_them(): void
     {
         $version = $this->newVersion('climatewatch_historical_emissions', 'incremental-fixture');
         $importer = app(CsvDatasetImporter::class);
@@ -113,11 +113,11 @@ class CsvDatasetImporterTest extends TestCase
             base_path('tests/Fixtures/imports/wide-country-sector-gas-year-incremental.csv'),
             $version
         );
-        $importer->apply($importer->approve($second, $operator->id), $operator->id);
 
-        $this->assertSame('applied', $second->fresh()->status);
-        $this->assertSame(5, DB::table('country_year_sector_gas_values')->where('dataset_version_id', $version->id)->count());
-        $this->assertSame(99.5, (float) DB::table('country_year_sector_gas_values')
+        $this->assertSame('validation_failed', $second->fresh()->status);
+        $this->assertSame(1, $second->rejected_rows);
+        $this->assertSame(4, DB::table('country_year_sector_gas_values')->where('dataset_version_id', $version->id)->count());
+        $this->assertSame(12.5, (float) DB::table('country_year_sector_gas_values')
             ->where('dataset_version_id', $version->id)
             ->where('country_code', 'NGA')
             ->where('year', 1990)

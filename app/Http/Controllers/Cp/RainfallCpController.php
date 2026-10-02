@@ -19,7 +19,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class RainfallCpController extends Controller
@@ -93,16 +92,46 @@ class RainfallCpController extends Controller
             'period_type' => ['nullable', 'string', 'max:32'],
         ]);
 
-        $version = $this->rainfallDatasetVersion();
-        $directory = storage_path('app/climatehub/imports');
-        File::ensureDirectoryExists($directory);
-        $filename = 'rainfall-'.now()->format('YmdHis').'-'.Str::random(8).'.csv';
-        $path = $validated['rainfall_csv']->move($directory, $filename)->getPathname();
+        $upload = $validated['rainfall_csv'];
+        $filename = basename($upload->getClientOriginalName());
 
-        $importer->queue('long_admin_period_indicator', $path, $version, array_filter([
-            'country_code' => 'NGA',
-            'period_type' => $validated['period_type'] ?? null,
-        ]));
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            throw ValidationException::withMessages(['rainfall_csv' => 'The CSV filename is invalid.']);
+        }
+
+        $version = $this->rainfallDatasetVersion();
+        $directory = storage_path('app/climatehub/imports/rainfall');
+        File::ensureDirectoryExists($directory);
+        $sourceHash = hash_file('sha256', $upload->getRealPath());
+        $duplicate = DatasetImport::query()
+            ->where('dataset_version_id', $version->id)
+            ->where('source_hash', $sourceHash)
+            ->oldest('id')
+            ->first();
+
+        if ($duplicate) {
+            throw ValidationException::withMessages([
+                'rainfall_csv' => "This CSV is the same file as import #{$duplicate->id} and was not staged again.",
+            ]);
+        }
+
+        if (File::exists($directory.DIRECTORY_SEPARATOR.$filename)) {
+            throw ValidationException::withMessages(['rainfall_csv' => "A rainfall file named [{$filename}] already exists."]);
+        }
+
+        $path = $upload->move($directory, $filename)->getPathname();
+
+        try {
+            $importer->queue('long_admin_period_indicator', $path, $version, array_filter([
+                'country_code' => 'NGA',
+                'period_type' => $validated['period_type'] ?? null,
+                'original_filename' => $filename,
+            ]));
+        } catch (CsvImportException $exception) {
+            File::delete($path);
+
+            throw ValidationException::withMessages(['rainfall_csv' => $exception->getMessage()]);
+        }
 
         return redirect()->route('statamic.cp.climatehub.rainfall.index')
             ->with('status', 'Rainfall CSV is queued for staged validation.');
@@ -226,7 +255,7 @@ class RainfallCpController extends Controller
     private function rainfallImports(DatasetVersion $version)
     {
         $imports = $version->imports()
-            ->with(['errors' => fn ($query) => $query->where('error_code', 'duplicate_source_file')])
+            ->with(['errors' => fn ($query) => $query->whereIn('error_code', ['duplicate_source_file', 'existing_dataset_records'])])
             ->latest('id')
             ->paginate(10, ['*'], 'imports_page')
             ->onEachSide(1)

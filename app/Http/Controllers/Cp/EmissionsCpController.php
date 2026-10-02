@@ -16,8 +16,8 @@ use App\Models\Sector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -82,11 +82,44 @@ class EmissionsCpController extends Controller
     public function inject(Request $request, CsvDatasetImporter $importer): RedirectResponse
     {
         $validated = $request->validate(['emissions_csv' => ['required', 'file', 'mimes:csv,txt', 'max:51200']]);
-        $directory = storage_path('app/climatehub/imports');
-        File::ensureDirectoryExists($directory);
-        $path = $validated['emissions_csv']->move($directory, 'emissions-'.now()->format('YmdHis').'-'.Str::random(8).'.csv')->getPathname();
+        $upload = $validated['emissions_csv'];
+        $filename = basename($upload->getClientOriginalName());
 
-        $importer->queue('wide_country_sector_gas_year', $path, $this->emissionsVersion());
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            throw ValidationException::withMessages(['emissions_csv' => 'The CSV filename is invalid.']);
+        }
+
+        $directory = storage_path('app/climatehub/imports/emissions');
+        File::ensureDirectoryExists($directory);
+        $version = $this->emissionsVersion();
+        $sourceHash = hash_file('sha256', $upload->getRealPath());
+        $duplicate = DatasetImport::query()
+            ->where('dataset_version_id', $version->id)
+            ->where('source_hash', $sourceHash)
+            ->oldest('id')
+            ->first();
+
+        if ($duplicate) {
+            throw ValidationException::withMessages([
+                'emissions_csv' => "This CSV is the same file as import #{$duplicate->id} and was not staged again.",
+            ]);
+        }
+
+        if (File::exists($directory.DIRECTORY_SEPARATOR.$filename)) {
+            throw ValidationException::withMessages(['emissions_csv' => "An emissions file named [{$filename}] already exists."]);
+        }
+
+        $path = $upload->move($directory, $filename)->getPathname();
+
+        try {
+            $importer->queue('wide_country_sector_gas_year', $path, $version, [
+                'original_filename' => $filename,
+            ]);
+        } catch (CsvImportException $exception) {
+            File::delete($path);
+
+            throw ValidationException::withMessages(['emissions_csv' => $exception->getMessage()]);
+        }
 
         return redirect()->route('statamic.cp.climatehub.emissions.index')->with('status', 'Emissions CSV is queued for staged validation.');
     }
@@ -98,9 +131,13 @@ class EmissionsCpController extends Controller
         abort_unless(is_numeric($userId), 403);
 
         try {
-            $importer->approve($import, (int) $userId);
+            $import = $importer->approve($import, (int) $userId);
         } catch (CsvImportException $exception) {
             throw ValidationException::withMessages(['emissions_import' => $exception->getMessage()]);
+        }
+
+        if ($import->status !== 'approved') {
+            throw ValidationException::withMessages(['emissions_import' => 'Existing emissions facts were found. The import was rejected and cannot be approved.']);
         }
 
         ApplyApprovedCsvDatasetImport::dispatch($import->id, (int) $userId)->onQueue('imports');
@@ -175,7 +212,7 @@ class EmissionsCpController extends Controller
     private function emissionsImports(DatasetVersion $version)
     {
         $imports = $version->imports()
-            ->with(['errors' => fn ($query) => $query->where('error_code', 'duplicate_source_file')])
+            ->with(['errors' => fn ($query) => $query->whereIn('error_code', ['duplicate_source_file', 'existing_dataset_records'])])
             ->latest('id')
             ->paginate(10, ['*'], 'imports_page')
             ->onEachSide(1)

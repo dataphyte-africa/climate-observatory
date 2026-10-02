@@ -2,14 +2,15 @@
 
 namespace Tests\Feature\Cp;
 
-use App\Models\User;
 use App\Models\CountryYearSectorGasValue;
 use App\Models\CountryYearSectorGasValueEdit;
 use App\Models\DatasetImport;
+use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Statamic\Facades\Blink;
 use Tests\TestCase;
 
@@ -59,46 +60,70 @@ class EmissionsCpControllerTest extends TestCase
         $this->assertSame(1, CountryYearSectorGasValueEdit::query()->count());
     }
 
-    public function test_emissions_duplicate_file_is_rejected_after_approval_by_the_queue_worker(): void
+    protected function tearDown(): void
+    {
+        File::deleteDirectory(storage_path('app/climatehub/imports'));
+
+        parent::tearDown();
+    }
+
+    public function test_emissions_duplicate_file_is_rejected_before_it_is_staged_again(): void
     {
         config()->set('queue.default', 'sync');
         $user = $this->operator();
         $csv = "country,sector,gas,source,1990\nNGA,Energy,CO2,Climate Watch,12.5\n";
+        $initialImportCount = DatasetImport::query()->count();
 
         $this->actingAs($user)
             ->post(route('statamic.cp.climatehub.emissions.inject'), [
-                'emissions_csv' => UploadedFile::fake()->createWithContent('emissions.csv', $csv),
+                'emissions_csv' => UploadedFile::fake()->createWithContent('primap-original.csv', $csv),
             ])
             ->assertRedirect(route('statamic.cp.climatehub.emissions.index'));
 
         $firstImport = DatasetImport::query()->latest('id')->firstOrFail();
-
-        $this->actingAs($user)
-            ->post(route('statamic.cp.climatehub.emissions.imports.approve', $firstImport))
-            ->assertRedirect(route('statamic.cp.climatehub.emissions.index'));
+        $this->assertSame('primap-original.csv', $firstImport->summary['original_filename']);
+        $this->assertFileExists(storage_path('app/climatehub/imports/emissions/primap-original.csv'));
 
         $this->actingAs($user)
             ->post(route('statamic.cp.climatehub.emissions.inject'), [
-                'emissions_csv' => UploadedFile::fake()->createWithContent('emissions.csv', $csv),
+                'emissions_csv' => UploadedFile::fake()->createWithContent('primap-original.csv', $csv),
+            ])
+            ->assertSessionHasErrors('emissions_csv');
+
+        $this->assertSame($initialImportCount + 1, DatasetImport::query()->count());
+    }
+
+    public function test_existing_emissions_records_are_rejected_during_staging_and_cannot_be_approved(): void
+    {
+        config()->set('queue.default', 'sync');
+        $user = $this->operator();
+        $fact = CountryYearSectorGasValue::query()->with(['sector', 'gas', 'source'])->firstOrFail();
+        $csv = implode("\n", [
+            "country,sector,gas,source,{$fact->year}",
+            implode(',', [$fact->country_code, $fact->sector->name, $fact->gas->name, $fact->source?->code, $fact->value]),
+            '',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('statamic.cp.climatehub.emissions.inject'), [
+                'emissions_csv' => UploadedFile::fake()->createWithContent('existing-emissions.csv', $csv),
             ])
             ->assertRedirect(route('statamic.cp.climatehub.emissions.index'));
 
-        $duplicateImport = DatasetImport::query()->latest('id')->firstOrFail();
-        $this->assertSame('awaiting_approval', $duplicateImport->status);
+        $import = DatasetImport::query()->latest('id')->firstOrFail();
+
+        $this->assertSame('validation_failed', $import->status);
+        $this->assertSame(0, $import->accepted_rows);
+        $this->assertSame(1, $import->rejected_rows);
+        $this->assertDatabaseHas('import_errors', [
+            'import_id' => $import->id,
+            'error_code' => 'existing_dataset_records',
+            'message' => 'Same dataset records already exist (1 conflicts).',
+        ]);
 
         $this->actingAs($user)
-            ->post(route('statamic.cp.climatehub.emissions.imports.approve', $duplicateImport))
-            ->assertRedirect(route('statamic.cp.climatehub.emissions.index'));
-
-        $this->assertDatabaseHas('imports', [
-            'id' => $duplicateImport->id,
-            'status' => 'rejected_duplicate',
-        ]);
-        $this->assertDatabaseHas('import_errors', [
-            'import_id' => $duplicateImport->id,
-            'error_code' => 'duplicate_source_file',
-            'message' => "Same file as import #{$firstImport->id}.",
-        ]);
+            ->post(route('statamic.cp.climatehub.emissions.imports.approve', $import))
+            ->assertSessionHasErrors('emissions_import');
     }
 
     public function test_emissions_import_history_is_paginated_in_sets_of_ten(): void

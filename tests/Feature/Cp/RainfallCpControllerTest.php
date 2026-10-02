@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Cp;
 
+use App\Jobs\ApplyApprovedCsvDatasetImport;
 use App\Models\AdminPeriodIndicatorValue;
 use App\Models\AdminPeriodIndicatorValueEdit;
 use App\Models\Dataset;
@@ -15,6 +16,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Statamic\Facades\Blink;
 use Tests\TestCase;
@@ -85,7 +87,14 @@ class RainfallCpControllerTest extends TestCase
         $this->assertSame($lowerValueRecord->id, $response->viewData('records')->first()->id);
     }
 
-    public function test_rainfall_injection_stages_a_csv_with_the_local_sync_queue(): void
+    protected function tearDown(): void
+    {
+        File::deleteDirectory(storage_path('app/climatehub/imports'));
+
+        parent::tearDown();
+    }
+
+    public function test_rainfall_injection_rejects_existing_records_and_duplicate_source_files(): void
     {
         config()->set('queue.default', 'sync');
         $record = $this->seedRainfallRecord();
@@ -100,52 +109,24 @@ class RainfallCpControllerTest extends TestCase
 
         $this->assertDatabaseHas('imports', [
             'dataset_version_id' => $record->dataset_version_id,
-            'status' => 'awaiting_approval',
-            'accepted_rows' => 1,
-            'rejected_rows' => 0,
+            'status' => 'validation_failed',
+            'accepted_rows' => 0,
+            'rejected_rows' => 1,
+        ]);
+        $this->assertDatabaseHas('import_errors', [
+            'error_code' => 'existing_dataset_records',
+            'message' => 'Same dataset records already exist (1 conflicts).',
         ]);
         $this->assertDatabaseHas('dataset_versions', [
             'id' => $record->dataset_version_id,
             'status' => 'published',
         ]);
 
-        $firstImport = DatasetImport::query()
-            ->where('dataset_version_id', $record->dataset_version_id)
-            ->latest('id')
-            ->firstOrFail();
-
         $this->actingAs($this->operator())
             ->post(route('statamic.cp.climatehub.rainfall.inject'), [
                 'rainfall_csv' => UploadedFile::fake()->createWithContent('rainfall.csv', $csv),
             ])
-            ->assertRedirect(route('statamic.cp.climatehub.rainfall.index'));
-
-        $duplicateImport = DatasetImport::query()
-            ->where('dataset_version_id', $record->dataset_version_id)
-            ->latest('id')
-            ->firstOrFail();
-
-        $this->assertSame('awaiting_approval', $duplicateImport->status);
-
-        $this->actingAs($this->operator())
-            ->post(route('statamic.cp.climatehub.rainfall.imports.approve', $duplicateImport))
-            ->assertRedirect(route('statamic.cp.climatehub.rainfall.index'));
-
-        $this->assertDatabaseHas('imports', [
-            'id' => $duplicateImport->id,
-            'status' => 'rejected_duplicate',
-            'error_count' => 1,
-        ]);
-        $this->assertDatabaseHas('import_errors', [
-            'import_id' => $duplicateImport->id,
-            'error_code' => 'duplicate_source_file',
-            'message' => "Same file as import #{$firstImport->id}.",
-        ]);
-
-        $this->actingAs($this->operator())
-            ->get(route('statamic.cp.climatehub.rainfall.index'))
-            ->assertOk()
-            ->assertSee("Same file as import #{$firstImport->id}.");
+            ->assertSessionHasErrors('rainfall_csv');
     }
 
     public function test_rainfall_import_history_is_paginated_in_sets_of_ten(): void
@@ -221,7 +202,7 @@ class RainfallCpControllerTest extends TestCase
             'id' => $record->dataset_version_id,
             'status' => 'published',
         ]);
-        Queue::assertPushed(\App\Jobs\ApplyApprovedCsvDatasetImport::class, fn ($job) => $job->importId === $import->id);
+        Queue::assertPushed(ApplyApprovedCsvDatasetImport::class, fn ($job) => $job->importId === $import->id);
     }
 
     private function seedRainfallRecord(): AdminPeriodIndicatorValue
@@ -254,7 +235,14 @@ class RainfallCpControllerTest extends TestCase
             'source_id' => $source->id,
             'geography_id' => $geography->id,
             'value' => 28.5,
-            'record_key' => hash('sha256', 'rainfall-test-record'),
+            'record_key' => hash('sha256', implode("\x1F", [
+                'admin_period_indicator_values',
+                $version->id,
+                $indicator->id,
+                $geography->code,
+                '2026-09-01',
+                'dekad',
+            ])),
         ]);
     }
 

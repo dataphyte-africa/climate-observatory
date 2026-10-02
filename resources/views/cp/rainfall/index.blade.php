@@ -120,10 +120,13 @@
                         @forelse ($imports as $import)
                             <tr>
                                 <td>
-                                    {{ basename($import->summary['path'] ?? 'Unknown file') }}
+                                    {{ $import->summary['original_filename'] ?? basename($import->summary['path'] ?? 'Unknown file') }}
                                     @php($duplicateMessage = $import->errors->firstWhere('error_code', 'duplicate_source_file')?->message)
+                                    @php($existingRecordsMessage = $import->errors->firstWhere('error_code', 'existing_dataset_records')?->message)
                                     @if ($duplicateMessage)
                                         <span class="rainfall-import-duplicate">{{ $duplicateMessage }}</span>
+                                    @elseif ($existingRecordsMessage)
+                                        <span class="rainfall-import-duplicate">{{ $existingRecordsMessage }}</span>
                                     @elseif ($import->duplicate_of_import_id ?? false)
                                         <span class="rainfall-import-duplicate">Same file as import #{{ $import->duplicate_of_import_id }}</span>
                                     @endif

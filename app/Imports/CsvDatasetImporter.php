@@ -24,6 +24,7 @@ class CsvDatasetImporter
     {
         $schema = $this->registry->resolve($schemaKey);
         $this->assertSchemaMatchesDataset($schemaKey, $schema, $version);
+        $originalFilename = $options['original_filename'] ?? basename($path);
 
         $import = DatasetImport::create([
             'dataset_version_id' => $version->id,
@@ -31,6 +32,7 @@ class CsvDatasetImporter
             'status' => 'pending',
             'summary' => [
                 'path' => $path,
+                'original_filename' => $originalFilename,
                 'target_table' => $schema->targetTable(),
                 'queued_at' => now()->toISOString(),
             ],
@@ -137,6 +139,7 @@ class CsvDatasetImporter
                 'source_hash' => hash_file('sha256', $path),
                 'summary' => [
                     'path' => $path,
+                    'original_filename' => $import->summary['original_filename'] ?? basename($path),
                     'target_table' => $schema->targetTable(),
                     'headers' => $normalizedHeader,
                 ],
@@ -208,6 +211,21 @@ class CsvDatasetImporter
                 DB::table('import_staged_records')->insert($buffer);
             }
 
+            $existingRecordCount = $this->rejectExistingTargetRecords($import, $schema->targetTable());
+
+            if ($existingRecordCount > 0) {
+                $acceptedRows -= $existingRecordCount;
+                $rejectedRows += $existingRecordCount;
+                $this->recordError(
+                    $import,
+                    0,
+                    null,
+                    'existing_dataset_records',
+                    "Same dataset records already exist ({$existingRecordCount} conflicts).",
+                    ['conflicting_record_count' => $existingRecordCount]
+                );
+            }
+
             $status = $rejectedRows > 0 ? 'validation_failed' : 'awaiting_approval';
 
             $import->forceFill([
@@ -219,6 +237,7 @@ class CsvDatasetImporter
                 'completed_at' => now(),
                 'summary' => [
                     'path' => $path,
+                    'original_filename' => $import->summary['original_filename'] ?? basename($path),
                     'target_table' => $schema->targetTable(),
                     'headers' => $normalizedHeader,
                 ],
@@ -248,6 +267,13 @@ class CsvDatasetImporter
 
             if ($import->status !== 'awaiting_approval' || $import->error_count > 0 || $import->accepted_rows === 0) {
                 throw new CsvImportException('Only a fully validated import with staged records can be approved.');
+            }
+
+            $schema = $this->registry->resolve($import->schema_key);
+            $existingRecordCount = $this->rejectExistingTargetRecords($import, $schema->targetTable());
+
+            if ($existingRecordCount > 0) {
+                return $this->markExistingTargetRecordsRejected($import, $existingRecordCount);
             }
 
             $import->forceFill([
@@ -293,6 +319,12 @@ class CsvDatasetImporter
         }
 
         try {
+            $existingRecordCount = $this->rejectExistingTargetRecords($import, $targetTable);
+
+            if ($existingRecordCount > 0) {
+                return $this->markExistingTargetRecordsRejected($import, $existingRecordCount);
+            }
+
             $preservePublishedState = $this->isPublishedVersion($version);
             $import->forceFill(['status' => 'applying'])->save();
             $version->forceFill(['status' => $preservePublishedState ? $version->status : 'applying'])->save();
@@ -491,6 +523,46 @@ class CsvDatasetImporter
         ])->save();
 
         $this->recordError($import, 0, null, 'duplicate_source_file', $message, []);
+
+        return $import->fresh();
+    }
+
+    private function rejectExistingTargetRecords(DatasetImport $import, string $targetTable): int
+    {
+        $recordKeys = DB::table('import_staged_records as staged')
+            ->join($targetTable.' as target', 'target.record_key', '=', 'staged.record_key')
+            ->where('staged.import_id', $import->id)
+            ->orderBy('staged.id')
+            ->pluck('staged.record_key');
+
+        foreach ($recordKeys->chunk(1000) as $keys) {
+            DB::table('import_staged_records')
+                ->where('import_id', $import->id)
+                ->whereIn('record_key', $keys->all())
+                ->delete();
+        }
+
+        return $recordKeys->count();
+    }
+
+    private function markExistingTargetRecordsRejected(DatasetImport $import, int $existingRecordCount): DatasetImport
+    {
+        $import->forceFill([
+            'status' => 'validation_failed',
+            'accepted_rows' => max(0, $import->accepted_rows - $existingRecordCount),
+            'rejected_rows' => $import->rejected_rows + $existingRecordCount,
+            'error_count' => $import->error_count + $existingRecordCount,
+            'completed_at' => now(),
+        ])->save();
+
+        $this->recordError(
+            $import,
+            0,
+            null,
+            'existing_dataset_records',
+            "Same dataset records already exist ({$existingRecordCount} conflicts).",
+            ['conflicting_record_count' => $existingRecordCount]
+        );
 
         return $import->fresh();
     }
