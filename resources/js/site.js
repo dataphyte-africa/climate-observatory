@@ -1418,9 +1418,21 @@ Alpine.data('emissionsComparison', (config = {}) => ({
             label: sector.label,
             code: sector.code,
             color: this.colors[index % this.colors.length],
-            value: this.selectedYearRange.reduce((total, year) => total + this.recordValue(country, sector.code, this.selectedGas, year), 0),
+            value: this.selectedYearRange.reduce((total, year) => {
+                const value = this.recordValues.get(this.recordKey(country, sector.code, this.selectedGas, year));
+
+                return value === undefined ? total : total + value;
+            }, 0),
+            hasData: this.selectedYearRange.some((year) => this.recordValues.has(this.recordKey(country, sector.code, this.selectedGas, year))),
             year: this.selectedYearLabel,
-        })).sort((left, right) => right.value - left.value);
+        })).map((row) => ({ ...row, value: row.hasData ? row.value : null }))
+            .sort((left, right) => {
+                if (left.value === null && right.value === null) return left.label.localeCompare(right.label);
+                if (left.value === null) return 1;
+                if (right.value === null) return -1;
+
+                return right.value - left.value;
+            });
     },
     get tableRows() {
         if (this.viewMode === 'composition') return this.compositionSeries.map((series) => ({
@@ -1872,7 +1884,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         if (!rows.length) return this.drawEmpty(context, width, height);
         const shown = rows.slice(0, 15);
         const chart = { left: 190, right: width - 68, top: 28, bottom: height - 30 };
-        const maximum = Math.max(1, ...shown.map((row) => row.value));
+        const maximum = Math.max(1, ...shown.map((row) => row.value ?? 0));
         const barHeight = Math.max(14, Math.min(25, (chart.bottom - chart.top) / shown.length - 8));
         context.strokeStyle = '#d9e2df';
         context.lineWidth = 1;
@@ -1889,11 +1901,13 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         context.font = '12px Inter, sans-serif';
         shown.forEach((row, index) => {
             const y = chart.top + (index * ((chart.bottom - chart.top) / shown.length)) + 4;
-            const length = (row.value / maximum) * (chart.right - chart.left);
+            const length = ((row.value ?? 0) / maximum) * (chart.right - chart.left);
             context.fillStyle = '#e4ebe8'; context.fillRect(chart.left, y, chart.right - chart.left, barHeight);
             context.fillStyle = row.color; context.fillRect(chart.left, y, length, barHeight);
             context.fillStyle = '#25302b'; context.textAlign = 'right'; context.fillText(row.label, chart.left - 12, y + barHeight - 4);
-            context.textAlign = 'left'; context.fillText(this.formatNumber(row.value), Math.min(chart.right + 8, chart.left + length + 8), y + barHeight - 4);
+            if (row.value !== null) {
+                context.textAlign = 'left'; context.fillText(this.formatNumber(row.value), Math.min(chart.right + 8, chart.left + length + 8), y + barHeight - 4);
+            }
         });
     },
     handleChartHover(event) {

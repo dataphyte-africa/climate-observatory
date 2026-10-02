@@ -204,20 +204,25 @@
     }
 
     .emissions-country-matrix__table {
+        width: 100%;
         min-width: max-content;
         border-collapse: separate;
         border-spacing: 0;
+        table-layout: fixed;
         font-size: 0.875rem;
     }
 
     .emissions-country-matrix__table th,
     .emissions-country-matrix__table td {
-        min-width: 10rem;
+        width: 8.5rem;
+        min-width: 8.5rem;
         border-right: 1px solid #d7e4e0;
         border-bottom: 1px solid #d7e4e0;
-        padding: 0.875rem 1rem;
+        padding: 0.75rem;
         text-align: right;
         white-space: nowrap;
+        font-size: 0.95rem;
+        font-variant-numeric: tabular-nums;
     }
 
     .emissions-country-matrix__table thead th {
@@ -248,6 +253,17 @@
         width: 100%;
         color: inherit;
         text-align: inherit;
+        white-space: normal;
+    }
+
+    .emissions-country-matrix__table thead th button b {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
+    }
+
+    .emissions-country-matrix__table thead th button .material-symbols-outlined {
+        flex: none;
     }
 
     .emissions-country-matrix__table thead th button:hover {
@@ -262,7 +278,8 @@
         position: sticky;
         left: 0;
         z-index: 15;
-        min-width: 13rem !important;
+        width: 11rem;
+        min-width: 11rem !important;
         background: #fff;
         text-align: left !important;
     }
