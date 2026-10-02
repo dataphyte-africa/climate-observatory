@@ -57,6 +57,16 @@ class EmissionsDashboardApiTest extends TestCase
         $this->assertCount(18, $records);
     }
 
+    public function test_country_filters_are_not_truncated_after_twelve_codes(): void
+    {
+        $codes = [...array_map(fn (int $index): string => 'X'.str_pad((string) $index, 2, '0', STR_PAD_LEFT), range(1, 12)), 'BRA'];
+
+        $response = $this->getJson('/api/emissions/dashboard?gas=kyotoghg&year_from=2023&year_to=2023&countries='.implode(',', $codes));
+
+        $response->assertOk();
+        $this->assertContains('BRA', collect($response->json('records'))->pluck('country')->all());
+    }
+
     public function test_it_rejects_an_invalid_emissions_query(): void
     {
         $this->getJson('/api/emissions/dashboard?gas=kyotoghg&year_from=2023&year_to=2022')

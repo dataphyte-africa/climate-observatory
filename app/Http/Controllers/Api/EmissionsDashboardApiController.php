@@ -79,7 +79,6 @@ class EmissionsDashboardApiController extends Controller
             ->map(fn ($code): string => strtoupper(trim((string) $code)))
             ->filter(fn (string $code): bool => preg_match('/^[A-Z0-9_]{2,32}$/', $code) === 1)
             ->unique()
-            ->take(12)
             ->values()
             ->all();
     }

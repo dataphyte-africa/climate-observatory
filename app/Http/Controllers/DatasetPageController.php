@@ -458,7 +458,7 @@ class DatasetPageController extends Controller
         if (! $version) {
             return [
                 'is_sample' => false,
-                'source_name' => $dataset?->source?->name,
+                'source_name' => 'PRIMAP',
                 'last_updated_label' => null,
                 'comparison_data' => ['countries' => [], 'sectors' => [], 'gases' => [], 'years' => [], 'records' => []],
             ];
@@ -531,7 +531,7 @@ class DatasetPageController extends Controller
 
             return [
                 'is_sample' => false,
-                'source_name' => $dataset?->source?->name,
+                'source_name' => 'PRIMAP',
                 'last_updated_label' => ($version->import_completed_at ?? $version->activated_at ?? $version->updated_at ?? $version->created_at)?->format('j M Y'),
                 'comparison_data' => [
                     'countries' => $countryCodes->map(fn (string $code): array => [
@@ -540,7 +540,7 @@ class DatasetPageController extends Controller
                     ])->values()->all(),
                     'gases' => $aggregateGases->concat($componentGases)->values()->all(),
                     'default_gas' => $defaultGas,
-                    'source_name' => $dataset?->source?->name,
+                    'source_name' => 'PRIMAP',
                     'has_individual_gases' => $componentGases->isNotEmpty(),
                     'years' => $years,
                     'sectors' => $sectorRows->mapWithKeys(fn (CountryYearSectorGasValue $row): array => [

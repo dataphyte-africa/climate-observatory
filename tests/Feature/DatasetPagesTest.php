@@ -150,8 +150,13 @@ class DatasetPagesTest extends TestCase
             ->assertSee('Kyoto GHG')
             ->assertSee('View country trend')
             ->assertSee('Countries')
+            ->assertSee('Select all', false)
             ->assertSee('Last update')
-            ->assertSee('x-model="selectedCountries"', false)
+            ->assertSee('x-model="draftSelectedCountries"', false)
+            ->assertSee('applyCountries()', false)
+            ->assertSee('sortTrendTable(year)', false)
+            ->assertSee('PRIMAP')
+            ->assertSee('role="status"', false)
             ->assertSee('x-model="selectedSector"', false)
             ->assertSee('x-model="selectedGas"', false)
             ->assertSee('x-data="emissionsComparison', false)
@@ -170,6 +175,15 @@ class DatasetPagesTest extends TestCase
             ->assertOk()
             ->assertSee('Global emissions')
             ->assertDontSee('Nigeria state and city emissions');
+    }
+
+    public function test_rainfall_tabs_are_addressable_by_hash(): void
+    {
+        $this->get('/rainfall')
+            ->assertOk()
+            ->assertSee('role="tab"', false)
+            ->assertSee('@click="loadMap(1)"', false)
+            ->assertSee('loadMap(2, selectedState.geography_code)', false);
     }
 
     public function test_downloads_and_topics_pages_load(): void

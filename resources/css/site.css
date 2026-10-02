@@ -184,6 +184,20 @@
         background: #ffffff;
     }
 
+    .emissions-loading-spinner {
+        animation: emissions-loading-spin 0.9s linear infinite;
+    }
+
+    @keyframes emissions-loading-spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .emissions-loading-spinner {
+            animation-duration: 2.5s;
+        }
+    }
+
     .emissions-analysis-grid {
         display: grid;
     }

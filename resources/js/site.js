@@ -611,13 +611,65 @@ Alpine.data('rainfallExplorer', (config = {}) => ({
         }).join('');
     },
     async init() {
+        window.addEventListener('hashchange', () => this.syncViewFromHash());
         if (this.selectedPeriod && this.selectedIndicator) {
-            await this.loadMap(1);
+            const requestedHash = window.location.hash;
+            const lgaMatch = requestedHash.match(/^#lga-map\/([A-Za-z0-9_-]+)$/);
+
+            if (!lgaMatch && requestedHash !== '#state-map') {
+                window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#state-map`);
+            }
+
+            if (lgaMatch) {
+                const stateCode = decodeURIComponent(lgaMatch[1]);
+                await this.loadMap(1, null, false);
+                this.selectedState = this.features.find((feature) => feature.properties.geography_code === stateCode)?.properties ?? null;
+
+                if (this.selectedState) {
+                    await this.loadMap(2, stateCode, false);
+                } else {
+                    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#state-map`);
+                }
+            } else {
+                await this.loadMap(1, null, false);
+            }
         }
     },
-    async loadMap(level = 1, parentCode = null) {
+    async syncViewFromHash() {
+        const hash = window.location.hash;
+        if (hash === '#state-map') {
+            if (this.activeLevel !== 1) await this.loadMap(1, null, false);
+            return;
+        }
+
+        const lgaMatch = hash.match(/^#lga-map\/([A-Za-z0-9_-]+)$/);
+        if (!lgaMatch) {
+            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#state-map`);
+            if (this.activeLevel !== 1) await this.loadMap(1, null, false);
+            return;
+        }
+
+        const stateCode = decodeURIComponent(lgaMatch[1]);
+        if (this.activeLevel === 2 && this.parentCode === stateCode) return;
+        if (this.selectedState?.geography_code !== stateCode) {
+            await this.loadMap(1, null, false);
+            this.selectedState = this.features.find((feature) => feature.properties.geography_code === stateCode)?.properties ?? null;
+        }
+
+        if (this.selectedState) {
+            await this.loadMap(2, stateCode, false);
+        } else {
+            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#state-map`);
+        }
+    },
+    async loadMap(level = 1, parentCode = null, updateUrl = true) {
         if (!this.selectedPeriod || !this.selectedIndicator) {
             return;
+        }
+
+        if (updateUrl) {
+            const hash = level === 2 && parentCode ? `#lga-map/${encodeURIComponent(parentCode)}` : '#state-map';
+            if (window.location.hash !== hash) window.location.hash = hash;
         }
 
         const selectedStateCode = level === 1 ? this.selectedState?.geography_code : null;
@@ -1163,7 +1215,10 @@ Alpine.data('emissionsComparison', (config = {}) => ({
     countryRankingCache: [],
     countryMatrixSortKey: '',
     countryMatrixSortDirection: 'desc',
+    trendTableSortKey: 'country',
+    trendTableSortDirection: 'asc',
     selectedCountries: [],
+    draftSelectedCountries: [],
     selectedSector: '',
     selectedSectorCountry: '',
     selectedGas: config.default_gas ?? '',
@@ -1192,11 +1247,19 @@ Alpine.data('emissionsComparison', (config = {}) => ({
     ],
     colors: ['#045A58', '#E7B460', '#007D8A', '#A95D35', '#445B56', '#A23B3B', '#497C5B', '#6A5A7A'],
     init() {
+        const requestedView = window.location.hash.slice(1);
+        if (this.viewModes.some((mode) => mode.code === requestedView)) {
+            this.viewMode = requestedView;
+        }
         this.selectedCountries = this.countries.slice(0, 6).map((country) => country.code);
+        this.draftSelectedCountries = [...this.selectedCountries];
         this.selectedSectorCountry = this.countries.some((country) => country.code === 'NGA') ? 'NGA' : this.countries[0]?.code ?? '';
         this.selectedMapCountry = this.selectedSectorCountry;
         this.selectedSector = this.defaultSector?.code ?? '';
         this.syncSelectedSectorToGas();
+        if (this.viewMode === 'countries' && this.totalGhgGas) {
+            this.selectedGas = this.totalGhgGas.code;
+        }
         this.countryMatrixSortKey = this.countryMatrixPrimarySector?.code ?? this.sectors[0]?.code ?? 'country';
         this.selectedCompositionGases = this.componentGases.map((gas) => gas.code);
         ['selectedCountries', 'selectedSector', 'selectedSectorCountry', 'selectedGas', 'selectedCompositionGases', 'yearStartIndex', 'yearEndIndex', 'viewMode', 'selectedMapCountry'].forEach((property) => {
@@ -1205,6 +1268,15 @@ Alpine.data('emissionsComparison', (config = {}) => ({
             });
         });
         this.$watch('selectedGas', () => this.syncSelectedSectorToGas());
+        window.addEventListener('hashchange', () => {
+            const requestedView = window.location.hash.slice(1);
+            if (this.viewModes.some((mode) => mode.code === requestedView) && requestedView !== this.viewMode) {
+                this.setView(requestedView);
+            }
+        });
+        if (!this.viewModes.some((mode) => mode.code === requestedView)) {
+            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${this.viewMode}`);
+        }
         this.$nextTick(() => {
             this.yearEndIndex = Math.max(0, this.availableYears.length - 1);
             this.ready = true;
@@ -1251,12 +1323,12 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         return this.countries.filter((country) => !query || country.label.toLowerCase().includes(query) || country.code.toLowerCase().includes(query)).slice(0, 100);
     },
     get countrySelectionLabel() {
-        if (!this.selectedCountries.length) return 'Choose countries';
-        if (this.selectedCountries.length === 1) return this.countryName(this.selectedCountries[0]);
-        return `${this.selectedCountries.length} countries selected`;
+        if (!this.draftSelectedCountries.length) return 'Choose countries';
+        if (this.draftSelectedCountries.length === 1) return this.countryName(this.draftSelectedCountries[0]);
+        return `${this.draftSelectedCountries.length} countries selected`;
     },
     get trendCountryLimitLabel() {
-        return `${this.selectedCountries.length} of 6 countries selected`;
+        return `${this.draftSelectedCountries.length} of ${this.countries.length} countries selected`;
     },
     get componentGases() {
         return this.gases.filter((gas) => !['all_ghg', 'kyotoghg'].includes(String(gas.code).toLowerCase()));
@@ -1293,6 +1365,19 @@ Alpine.data('emissionsComparison', (config = {}) => ({
             color: this.colors[index % this.colors.length],
             values: years.map((year) => this.valueFor(code, year)),
         })).filter((series) => series.values.some((value) => value !== 0));
+    },
+    get sortedTrendSeries() {
+        const direction = this.trendTableSortDirection === 'asc' ? 1 : -1;
+
+        return [...this.chartSeries].sort((left, right) => {
+            if (this.trendTableSortKey === 'country') {
+                return direction * left.label.localeCompare(right.label);
+            }
+
+            const yearIndex = this.selectedYearRange.indexOf(Number(this.trendTableSortKey));
+            return direction * ((left.values[yearIndex] ?? 0) - (right.values[yearIndex] ?? 0))
+                || left.label.localeCompare(right.label);
+        });
     },
     get activeYear() {
         return this.selectedYearRange.at(-1) ?? null;
@@ -1400,6 +1485,26 @@ Alpine.data('emissionsComparison', (config = {}) => ({
 
         this.countryMatrixSortKey = key;
         this.countryMatrixSortDirection = key === 'country' ? 'asc' : 'desc';
+    },
+    sortTrendTable(key) {
+        const sortKey = String(key);
+        if (this.trendTableSortKey === sortKey) {
+            this.trendTableSortDirection = this.trendTableSortDirection === 'asc' ? 'desc' : 'asc';
+            return;
+        }
+
+        this.trendTableSortKey = sortKey;
+        this.trendTableSortDirection = sortKey === 'country' ? 'asc' : 'desc';
+    },
+    trendTableSortIcon(key) {
+        if (this.trendTableSortKey !== String(key)) return 'unfold_more';
+
+        return this.trendTableSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward';
+    },
+    trendTableSortState(key) {
+        if (this.trendTableSortKey !== String(key)) return 'none';
+
+        return this.trendTableSortDirection === 'asc' ? 'ascending' : 'descending';
     },
     countryMatrixSortIcon(key) {
         if (this.countryMatrixSortKey !== key) return 'unfold_more';
@@ -1540,7 +1645,12 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         return this.sectors.find((sector) => sector.code === code)?.label ?? 'selected sector';
     },
     setView(mode) {
+        if (!this.viewModes.some((item) => item.code === mode)) return;
         this.viewMode = mode;
+        if (mode === 'trends') this.draftSelectedCountries = [...this.selectedCountries];
+        if (window.location.hash !== `#${mode}`) {
+            window.location.hash = mode;
+        }
         if (mode === 'countries') {
             if (this.totalGhgGas) this.selectedGas = this.totalGhgGas.code;
         }
@@ -1549,7 +1659,11 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         }
     },
     selectAllCountries() {
-        this.selectedCountries = this.countries.slice(0, 6).map((country) => country.code);
+        this.draftSelectedCountries = this.countries.map((country) => country.code);
+    },
+    applyCountries() {
+        this.selectedCountries = [...this.draftSelectedCountries];
+        this.countryMenuOpen = false;
     },
     selectAllCompositionGases() {
         this.selectedCompositionGases = this.componentGases.map((gas) => gas.code);
@@ -1566,10 +1680,6 @@ Alpine.data('emissionsComparison', (config = {}) => ({
     toggleCountry(code) {
         this.highlightedCountry = this.highlightedCountry === code ? '' : code;
         this.$nextTick(() => this.drawChart());
-    },
-    limitCountrySelection(event, code) {
-        if (!event.target.checked || this.selectedCountries.length <= 6) return;
-        this.selectedCountries = this.selectedCountries.filter((countryCode) => countryCode !== code);
     },
     get mapRows() {
         return this.countryRanking.map((row, index) => ({ ...row, rank: index + 1 }));
@@ -1677,7 +1787,9 @@ Alpine.data('emissionsComparison', (config = {}) => ({
             year_to: String(years.to),
         });
         if (this.viewMode === 'trends') {
-            params.set('countries', this.selectedCountries.join(','));
+            if (this.selectedCountries.length < this.countries.length) {
+                params.set('countries', this.selectedCountries.join(','));
+            }
         } else if (this.viewMode === 'sectors') {
             params.set('countries', this.selectedSectorCountry);
         } else if (this.viewMode === 'composition') {

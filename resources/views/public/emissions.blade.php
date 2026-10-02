@@ -39,15 +39,16 @@
                     </button>
                     <div x-cloak x-show="countryMenuOpen" class="absolute left-0 top-full z-50 mt-2 w-full border border-[#BFD5D0] bg-white p-3 shadow-xl">
                         <input class="ch-input w-full py-2 text-sm" type="search" x-model="countrySearch" placeholder="Search countries">
-                        <div class="mt-2 flex items-center justify-between gap-2 border-b border-outline-variant pb-2 text-xs font-semibold text-secondary"><button type="button" @click="selectAllCountries()">Select first 6</button><span x-show="viewMode === 'trends'" x-text="trendCountryLimitLabel"></span><button type="button" @click="selectedCountries = []">Clear</button></div>
+                        <div class="mt-2 flex items-center justify-between gap-2 border-b border-outline-variant pb-2 text-xs font-semibold text-secondary"><button type="button" @click="selectAllCountries()">Select all</button><span x-text="trendCountryLimitLabel"></span><button type="button" @click="draftSelectedCountries = []">Clear</button></div>
                         <div class="mt-2 max-h-56 space-y-1 overflow-auto">
                             <template x-for="country in visibleCountries" :key="country.code">
                                 <label class="flex cursor-pointer items-center gap-2 px-1 py-1.5 text-sm hover:bg-surface-container">
-                                    <input type="checkbox" class="rounded border-outline-variant text-secondary" :value="country.code" x-model="selectedCountries" @change="limitCountrySelection($event, country.code)">
+                                    <input type="checkbox" class="rounded border-outline-variant text-secondary" :value="country.code" x-model="draftSelectedCountries">
                                     <span x-text="country.label"></span>
                                 </label>
                             </template>
                         </div>
+                        <button class="ch-btn-primary mt-3 w-full" type="button" @click="applyCountries()">Apply</button>
                     </div>
                 </div>
 
@@ -92,7 +93,7 @@
             </div>
         </section>
 
-        <section class="emissions-visual-stage emissions-bleed" aria-live="polite">
+        <section class="emissions-visual-stage emissions-bleed" aria-live="polite" :aria-busy="recordsLoading">
             <div class="bg-[#045A58] text-white">
                 <div class="ch-shell flex flex-wrap items-center justify-between gap-3 py-4">
                     <div class="flex items-start gap-3">
@@ -130,9 +131,10 @@
                         </div>
                     </div>
                     <div x-show="viewMode !== 'countries'" class="relative h-[320px] md:h-[420px]">
-                    <div class="absolute inset-x-0 top-0 z-20 flex flex-wrap gap-x-4 gap-y-2 text-xs text-on-surface-variant" x-show="viewMode === 'trends'">
+                    <div class="absolute inset-x-0 top-0 z-20 flex flex-wrap gap-x-4 gap-y-2 text-xs text-on-surface-variant" x-show="viewMode === 'trends' && chartSeries.length <= 12">
                         <template x-for="series in chartSeries" :key="series.code"><button type="button" class="flex items-center gap-2 rounded px-1 py-1 text-left transition-colors hover:bg-surface-container" :class="highlightedCountry === series.code ? 'bg-surface-container font-semibold text-primary' : ''" @click="toggleCountry(series.code)" :aria-pressed="highlightedCountry === series.code"><span class="h-2.5 w-2.5 rounded-full" :style="`background-color: ${series.color}`"></span><span x-text="series.label"></span></button></template>
                     </div>
+                    <div class="absolute inset-x-0 top-0 z-20 text-xs text-on-surface-variant" x-show="viewMode === 'trends' && chartSeries.length > 12" x-text="`${chartSeries.length} countries shown`"></div>
                     <div class="absolute inset-x-0 top-0 z-20 flex flex-wrap gap-x-4 gap-y-2 text-xs text-on-surface-variant" x-show="viewMode === 'composition'">
                         <template x-for="series in compositionSeries" :key="series.code"><span class="flex items-center gap-2 rounded bg-surface-container-lowest px-2 py-1"><span class="h-2.5 w-2.5 rounded-full" :style="`background-color: ${series.color}`"></span><span x-text="series.label"></span></span></template>
                     </div>
@@ -146,8 +148,13 @@
                     <div x-cloak x-show="tooltip.visible" class="pointer-events-none absolute z-10 rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-xs shadow-lg" :style="`left:${tooltip.x}px; top:${tooltip.y}px; transform: translate(12px, -110%);`">
                         <p class="font-semibold text-primary" x-text="tooltip.label"></p><p class="mt-1 text-on-surface-variant"><span x-text="tooltip.year"></span> · <span x-text="tooltip.value === null ? 'No data' : formatNumber(tooltip.value)"></span></p>
                     </div>
-                </div>
-                    <p class="mt-3 text-xs text-on-surface-variant" x-show="recordsLoading">Updating published values.</p>
+                    </div>
+                    <div x-cloak x-show="recordsLoading" class="absolute inset-0 z-30 flex items-center justify-center bg-white/65" role="status" aria-live="polite">
+                        <span class="flex items-center gap-2 border border-[#BFD5D0] bg-white px-4 py-3 text-sm font-medium text-[#045A58] shadow-sm">
+                            <span class="material-symbols-outlined emissions-loading-spinner text-xl" aria-hidden="true">progress_activity</span>
+                            Updating data
+                        </span>
+                    </div>
                     <p class="mt-3 text-xs text-error" x-show="recordsError" x-text="recordsError"></p>
                     <p class="mt-3 text-xs text-on-surface-variant" x-show="!recordsLoading && !recordsError && !hasChartData" x-text="emptyChartMessage"></p>
                 </div>
@@ -196,7 +203,7 @@
                 <div><p class="text-xs font-semibold uppercase tracking-[0.05em] text-[#A87B29]">Published records</p><h2 class="mt-1 font-headline text-lg font-semibold text-[#045A58]" x-text="tableTitle"></h2><p class="mt-1 text-xs text-on-surface-variant" x-text="tableSubtitle"></p></div>
                 <span class="border border-[#BFD5D0] px-2 py-1 text-xs font-semibold text-[#045A58]" x-text="`${tableRowCount} rows`"></span>
             </div>
-            <div x-show="viewMode === 'trends'" class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-surface-container-low text-xs uppercase tracking-[0.05em] text-on-surface-variant"><tr><th class="sticky left-0 bg-surface-container-low px-5 py-3">Country</th><template x-for="year in selectedYearRange" :key="year"><th class="px-5 py-3 text-right" x-text="year"></th></template></tr></thead><tbody><template x-for="series in chartSeries" :key="series.code"><tr class="border-t border-outline-variant"><td class="sticky left-0 bg-surface-container-lowest px-5 py-3 font-medium text-primary" x-text="series.label"></td><template x-for="(value, index) in series.values" :key="`${series.code}-${selectedYearRange[index]}`"><td class="px-5 py-3 text-right" x-text="formatNumber(value)"></td></template></tr></template></tbody></table></div>
+            <div x-show="viewMode === 'trends'" class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-surface-container-low text-xs uppercase tracking-[0.05em] text-on-surface-variant"><tr><th class="sticky left-0 bg-surface-container-low px-5 py-3" :aria-sort="trendTableSortState('country')"><button type="button" @click="sortTrendTable('country')">Country <i class="material-symbols-outlined align-middle text-base" aria-hidden="true" x-text="trendTableSortIcon('country')"></i></button></th><template x-for="year in selectedYearRange" :key="year"><th class="px-5 py-3 text-right" :aria-sort="trendTableSortState(year)"><button type="button" @click="sortTrendTable(year)"><span x-text="year"></span> <i class="material-symbols-outlined align-middle text-base" aria-hidden="true" x-text="trendTableSortIcon(year)"></i></button></th></template></tr></thead><tbody><template x-for="series in sortedTrendSeries" :key="series.code"><tr class="border-t border-outline-variant"><td class="sticky left-0 bg-surface-container-lowest px-5 py-3 font-medium text-primary" x-text="series.label"></td><template x-for="(value, index) in series.values" :key="`${series.code}-${selectedYearRange[index]}`"><td class="px-5 py-3 text-right" x-text="formatNumber(value)"></td></template></tr></template></tbody></table></div>
             <div x-show="viewMode !== 'trends'" class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-surface-container-low text-xs uppercase tracking-[0.05em] text-on-surface-variant"><tr><th class="px-5 py-3" x-text="tableLabel"></th><th class="px-5 py-3 text-right">Value</th><th class="px-5 py-3 text-right" x-text="viewMode === 'composition' ? 'Period' : 'Year'"></th></tr></thead><tbody><template x-for="row in tableRows" :key="`${row.label}-${row.year}`"><tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium text-primary" x-text="row.label"></td><td class="px-5 py-3 text-right" x-text="row.value === null ? '—' : formatNumber(row.value)"></td><td class="px-5 py-3 text-right text-on-surface-variant" x-text="row.year"></td></tr></template></tbody></table></div>
         </section>
 
