@@ -85,4 +85,11 @@ class ClimateSchemaTest extends TestCase
         $this->assertDatabaseMissing('collections', ['handle' => 'data_files']);
         $this->assertSame(0, DB::table('entries')->where('collection', 'data_files')->count());
     }
+
+    public function test_statamic_assets_container_definition_uses_the_public_assets_disk(): void
+    {
+        $this->assertSame(public_path('assets'), config('filesystems.disks.assets.root'));
+        $this->assertSame('/assets', config('filesystems.disks.assets.url'));
+        $this->assertStringContainsString('disk: assets', file_get_contents(base_path('content/assets/assets.yaml')));
+    }
 }
