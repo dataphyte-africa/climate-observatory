@@ -1217,6 +1217,8 @@ Alpine.data('emissionsComparison', (config = {}) => ({
     countryMatrixSortDirection: 'desc',
     trendTableSortKey: 'country',
     trendTableSortDirection: 'asc',
+    trendTablePage: 1,
+    trendTablePageSize: 20,
     selectedCountries: [],
     draftSelectedCountries: [],
     selectedSector: '',
@@ -1264,6 +1266,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         this.selectedCompositionGases = this.componentGases.map((gas) => gas.code);
         ['selectedCountries', 'selectedSector', 'selectedSectorCountry', 'selectedGas', 'selectedCompositionGases', 'yearStartIndex', 'yearEndIndex', 'viewMode', 'selectedMapCountry'].forEach((property) => {
             this.$watch(property, () => {
+                if (property !== 'selectedMapCountry') this.trendTablePage = 1;
                 if (this.ready) this.scheduleRecordsRefresh();
             });
         });
@@ -1379,6 +1382,19 @@ Alpine.data('emissionsComparison', (config = {}) => ({
                 || left.label.localeCompare(right.label);
         });
     },
+    get paginatedTrendSeries() {
+        const start = (this.trendTablePage - 1) * this.trendTablePageSize;
+        return this.sortedTrendSeries.slice(start, start + this.trendTablePageSize);
+    },
+    get trendTablePageCount() {
+        return Math.max(1, Math.ceil(this.sortedTrendSeries.length / this.trendTablePageSize));
+    },
+    get trendChartLimitExceeded() {
+        return this.selectedCountries.length > 6;
+    },
+    get plottedTrendSeries() {
+        return this.trendChartLimitExceeded ? [] : this.chartSeries;
+    },
     get activeYear() {
         return this.selectedYearRange.at(-1) ?? null;
     },
@@ -1487,6 +1503,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         this.countryMatrixSortDirection = key === 'country' ? 'asc' : 'desc';
     },
     sortTrendTable(key) {
+        this.trendTablePage = 1;
         const sortKey = String(key);
         if (this.trendTableSortKey === sortKey) {
             this.trendTableSortDirection = this.trendTableSortDirection === 'asc' ? 'desc' : 'asc';
@@ -1547,7 +1564,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         })).filter((row) => row.value !== 0).sort((left, right) => right.value - left.value);
         if (this.viewMode === 'sectors') return this.sectorRanking;
         if (this.viewMode === 'countries') return this.countryMatrixRows;
-        if (this.viewMode === 'map') return this.countryRanking;
+        if (this.viewMode === 'map') return this.countryRanking.slice(0, 20);
         return this.countryRanking.filter((row) => this.selectedCountries.includes(row.code));
     },
     get tableRowCount() {
@@ -1567,7 +1584,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         if (this.viewMode === 'composition') return 'End-of-range values for each selected gas.';
         if (this.viewMode === 'trends') return 'Compare every selected reporting year for each country.';
         if (this.viewMode === 'sectors') return 'Each value is the cumulative published emissions for the selected gas and reporting-year range.';
-        if (this.viewMode === 'map') return 'Ranked values are cumulative for the selected gas, sector, and reporting-year range.';
+        if (this.viewMode === 'map') return 'Top 20 countries by cumulative value for the selected gas, sector, and reporting-year range.';
         return 'Ranked values use the selected gas, sector, and reporting year.';
     },
     get chartTitle() {
@@ -1610,7 +1627,9 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         if (this.viewMode === 'map') return this.mapRows.length > 0;
         if (this.viewMode === 'composition') return this.compositionSeries.length > 0;
         if (this.viewMode === 'countries') return this.countryMatrixRows.some((row) => Object.values(row.values).some((value) => value !== null));
-        return this.viewMode === 'trends' ? this.chartSeries.length > 0 : this.tableRows.length > 0;
+        return this.viewMode === 'trends'
+            ? !this.trendChartLimitExceeded && this.chartSeries.length > 0
+            : this.tableRows.length > 0;
     },
     get profileCountry() {
         if (this.viewMode === 'map') return this.selectedMapCountry;
@@ -1663,6 +1682,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
     },
     applyCountries() {
         this.selectedCountries = [...this.draftSelectedCountries];
+        this.trendTablePage = 1;
         this.countryMenuOpen = false;
     },
     selectAllCompositionGases() {
@@ -1876,8 +1896,9 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         context.clearRect(0, 0, width, height);
         this.chartDimensions = { width, height };
         if (['map', 'countries'].includes(this.viewMode)) return;
-        if (this.viewMode === 'trends') this.drawTrendChart(context, width, height);
-        else if (this.viewMode === 'composition') this.drawStackedAreaChart(context, width, height);
+        if (this.viewMode === 'trends') {
+            if (!this.trendChartLimitExceeded) this.drawTrendChart(context, width, height);
+        } else if (this.viewMode === 'composition') this.drawStackedAreaChart(context, width, height);
         else this.drawBarChart(context, width, height, this.tableRows);
     },
     drawGrid(context, chart, maximum) {
