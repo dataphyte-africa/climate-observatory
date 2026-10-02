@@ -66,8 +66,7 @@ class EmissionsDashboardApiController extends Controller
 
         return response()
             ->json($payload)
-            ->header('Cache-Control', 'public, max-age='.self::CACHE_SECONDS.', stale-while-revalidate='.self::CACHE_SECONDS)
-            ->header('X-Cache-TTL', (string) self::CACHE_SECONDS);
+            ->header('Cache-Control', 'private, no-store, no-cache, must-revalidate');
     }
 
     /** @return list<string> */

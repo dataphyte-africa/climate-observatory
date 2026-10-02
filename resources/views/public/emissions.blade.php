@@ -149,7 +149,7 @@
                 </div>
                     <p class="mt-3 text-xs text-on-surface-variant" x-show="recordsLoading">Updating published values.</p>
                     <p class="mt-3 text-xs text-error" x-show="recordsError" x-text="recordsError"></p>
-                    <p class="mt-3 text-xs text-on-surface-variant" x-show="!recordsLoading && !recordsError && !hasChartData">No published records match these controls.</p>
+                    <p class="mt-3 text-xs text-on-surface-variant" x-show="!recordsLoading && !recordsError && !hasChartData" x-text="emptyChartMessage"></p>
                 </div>
                         <aside class="emissions-insight-rail" x-cloak x-show="viewMode === 'map'">
                     <div x-show="viewMode === 'map' && selectedMapRow">

@@ -1149,6 +1149,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
     countries: config.countries ?? [],
     sectors: config.sectors ?? [],
     gases: config.gases ?? [],
+    gasSectors: config.gas_sectors ?? {},
     years: config.years ?? [],
     records: config.records ?? [],
     recordValues: new Map(),
@@ -1195,6 +1196,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
         this.selectedSectorCountry = this.countries.some((country) => country.code === 'NGA') ? 'NGA' : this.countries[0]?.code ?? '';
         this.selectedMapCountry = this.selectedSectorCountry;
         this.selectedSector = this.defaultSector?.code ?? '';
+        this.syncSelectedSectorToGas();
         this.countryMatrixSortKey = this.countryMatrixPrimarySector?.code ?? this.sectors[0]?.code ?? 'country';
         this.selectedCompositionGases = this.componentGases.map((gas) => gas.code);
         ['selectedCountries', 'selectedSector', 'selectedSectorCountry', 'selectedGas', 'selectedCompositionGases', 'yearStartIndex', 'yearEndIndex', 'viewMode', 'selectedMapCountry'].forEach((property) => {
@@ -1202,6 +1204,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
                 if (this.ready) this.scheduleRecordsRefresh();
             });
         });
+        this.$watch('selectedGas', () => this.syncSelectedSectorToGas());
         this.$nextTick(() => {
             this.yearEndIndex = Math.max(0, this.availableYears.length - 1);
             this.ready = true;
@@ -1214,6 +1217,22 @@ Alpine.data('emissionsComparison', (config = {}) => ({
     },
     get availableYears() {
         return this.years;
+    },
+    syncSelectedSectorToGas() {
+        const available = this.gasSectors[this.selectedGas] ?? [];
+        if (!available.length || available.includes(this.selectedSector)) return;
+        this.selectedSector = available.includes('total_excluding_lulucf')
+            ? 'total_excluding_lulucf'
+            : (this.sectors.find((sector) => available.includes(sector.code))?.code ?? available[0]);
+    },
+    get emptyChartMessage() {
+        const gas = this.gases.find((item) => item.code === this.selectedGas)?.label ?? 'This gas';
+        const sectors = (this.gasSectors[this.selectedGas] ?? [])
+            .map((code) => this.sectors.find((sector) => sector.code === code)?.label ?? code);
+
+        if (!sectors.length) return `No published records are available for ${gas}.`;
+
+        return `No published records match these countries and years. ${gas} is available for: ${sectors.join(', ')}.`;
     },
     get selectedYearRange() {
         const start = Math.min(Number(this.yearStartIndex), Number(this.yearEndIndex));
@@ -1401,7 +1420,7 @@ Alpine.data('emissionsComparison', (config = {}) => ({
             color: this.colors[index % this.colors.length],
             value: this.selectedYearRange.reduce((total, year) => total + this.recordValue(country, sector.code, this.selectedGas, year), 0),
             year: this.selectedYearLabel,
-        })).filter((row) => row.value !== 0).sort((left, right) => right.value - left.value);
+        })).sort((left, right) => right.value - left.value);
     },
     get tableRows() {
         if (this.viewMode === 'composition') return this.compositionSeries.map((series) => ({

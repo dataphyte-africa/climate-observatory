@@ -485,6 +485,12 @@ class DatasetPageController extends Controller
                 ->select('sector_id')
                 ->distinct()
                 ->get();
+            $gasSectorRows = CountryYearSectorGasValue::query()
+                ->with(['gas:id,code', 'sector:id,code'])
+                ->where('dataset_version_id', $version->id)
+                ->select(['gas_id', 'sector_id'])
+                ->distinct()
+                ->get();
             $years = CountryYearSectorGasValue::query()
                 ->where('dataset_version_id', $version->id)
                 ->distinct()
@@ -502,7 +508,9 @@ class DatasetPageController extends Controller
                     return $countryNames[$code];
                 }
 
-                return class_exists(\Locale::class) ? \Locale::getDisplayRegion('und_'.$code, 'en') : $code;
+                $label = class_exists(\Locale::class) ? \Locale::getDisplayRegion('und_'.$code, 'en') : '';
+
+                return filled($label) ? $label : $code;
             };
             $gases = $gasRows->mapWithKeys(fn (CountryYearSectorGasValue $row): array => [
                 $row->gas?->code => in_array(strtolower((string) $row->gas?->code), ['all_ghg', 'kyotoghg'], true)
@@ -541,6 +549,11 @@ class DatasetPageController extends Controller
                         'code' => $code,
                         'label' => $label,
                     ])->values()->all(),
+                    'gas_sectors' => $gasSectorRows
+                        ->filter(fn (CountryYearSectorGasValue $row): bool => $row->gas && $row->sector)
+                        ->groupBy(fn (CountryYearSectorGasValue $row): string => $row->gas->code)
+                        ->map(fn ($rows): array => $rows->pluck('sector.code')->unique()->values()->all())
+                        ->all(),
                     'records' => [],
                 ],
             ];
